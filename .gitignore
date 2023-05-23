@@ -1,0 +1,6 @@
+.idea
+.gradle
+*.pdf
+build
+out
+bin
