@@ -1,15 +1,22 @@
 package pt.isel.pc.problemsets.set3
 
 import kotlinx.coroutines.*
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.resume
-import kotlin.jvm.Throws
 import kotlin.time.Duration
+import kotlin.time.DurationUnit
+import kotlin.time.toDuration
 
 
 class MessageQueue<T>(private val capacity: Int) {
+
+    val producersSize get() = producers.size
+    val consumersSize get() = consumers.size
+    val itemsSize get() = items.size
 
     init {
         require(capacity >= 0) { "Capacity must be greater than 0 but was $capacity." }
@@ -24,11 +31,14 @@ class MessageQueue<T>(private val capacity: Int) {
 
     private inner class ProducerRequest(
         var item: T,
-        val continuation: Continuation<Unit>
+        var continuation: Continuation<Unit>? = null,
+        var isDone: Boolean = false
     )
 
     private inner class ConsumerRequest(
-        var continuation: Continuation<T>?
+        var res: T? = null,
+        var continuation: Continuation<T>? = null,
+        var isDone: Boolean = false
     )
 
     suspend fun enqueue(message: T) {
@@ -37,7 +47,9 @@ class MessageQueue<T>(private val capacity: Int) {
         // fast path
         if (consumers.isNotEmpty()) {
             val consumerReq = consumers.removeFirst()
+            consumerReq.res = message
             consumerReq.continuation!!.resume(message)
+            consumerReq.isDone = true
             lock.unlock()
             return
         }
@@ -49,10 +61,21 @@ class MessageQueue<T>(private val capacity: Int) {
         }
 
         // wait path
-        return suspendCancellableCoroutine { continuation ->
-            val request = ProducerRequest(message, continuation)
-            producers.add(request)
-            lock.unlock()
+        val req = ProducerRequest(message)
+
+        try {
+            return suspendCancellableCoroutine { continuation ->
+                req.continuation = continuation
+                producers.add(req)
+                lock.unlock()
+            }
+        } catch (e: CancellationException) {
+            lock.withLock {
+                if (!req.isDone) {
+                    producers.remove(req)
+                    throw e
+                }
+            }
         }
     }
 
@@ -68,7 +91,7 @@ class MessageQueue<T>(private val capacity: Int) {
         }
 
         // wait path
-        val req = ConsumerRequest(null)
+        val req = ConsumerRequest()
 
         try {
             return withTimeout(timeout) {
@@ -78,9 +101,19 @@ class MessageQueue<T>(private val capacity: Int) {
                     lock.unlock()
                 }
             }
-        } catch (e: TimeoutCancellationException) {
-            consumers.remove(req)
-            throw TimeoutException(e.message)
+        } catch (e: CancellationException) { // note: TimeoutCancellationException is derivative of CancellationException
+            lock.withLock {
+                if (!req.isDone) {
+                    consumers.remove(req)
+                    throw e
+                }
+                return req.res!!
+                // else succeed
+                // NOTE: the coroutine is still cancelled; the caller
+                //       is responsible for dealing with that situation
+                //       (acquire returned with permits but the
+                //        coroutine was cancelled simultaneously)
+            }
         }
     }
 
@@ -88,7 +121,8 @@ class MessageQueue<T>(private val capacity: Int) {
         if (producers.isNotEmpty()) {
             val producerReq = producers.removeFirst()
             items.add(producerReq.item)
-            producerReq.continuation.resume(Unit)
+            producerReq.isDone = true
+            producerReq.continuation!!.resume(Unit)
         }
         return items.removeFirst()
     }
