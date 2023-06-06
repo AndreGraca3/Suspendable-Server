@@ -1,9 +1,13 @@
 package pt.isel.pc.baseServer
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
+import pt.isel.pc.problemsets.set3.suspendingAccept
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.SocketException
+import java.nio.channels.AsynchronousServerSocketChannel
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 
@@ -13,16 +17,17 @@ import kotlin.concurrent.thread
 class Server(
     private val listeningAddress: String,
     private val listeningPort: Int,
+    private val scope: CoroutineScope
 ) : AutoCloseable {
 
-    private val serverSocket: ServerSocket = ServerSocket()
+    private val serverSocket: AsynchronousServerSocketChannel = AsynchronousServerSocketChannel.open()
     private val isListening = CountDownLatch(1)
 
     /**
      * The listening thread is mainly comprised by loop waiting for connections and creating a [ConnectedClient]
      * for each accepted connection.
      */
-    private val listeningThread = thread(isDaemon = true) {
+    private val listeningThread = scope.launch {
         serverSocket.use { serverSocket ->
             serverSocket.bind(InetSocketAddress(listeningAddress, listeningPort))
             logger.info("server socket bound to ({}:{})", listeningAddress, listeningPort)
@@ -41,22 +46,22 @@ class Server(
         serverSocket.close()
     }
 
-    fun join() = listeningThread.join()
+    suspend fun join() = listeningThread.join()
 
     override fun close() {
         shutdown()
-        join()
+        scope.launch { join() }
     }
 
-    private fun acceptLoop(serverSocket: ServerSocket) {
+    private suspend fun acceptLoop(serverSocket: AsynchronousServerSocketChannel) {
         var clientId = 0
         val roomContainer = RoomContainer()
         val clientContainer = ConnectedClientContainer()
         while (true) {
             try {
                 logger.info("accepting new client")
-                val socket = serverSocket.accept()
-                logger.info("client socket accepted, remote address is {}", socket.inetAddress.hostAddress)
+                val socket = serverSocket.suspendingAccept()
+                logger.info("client socket accepted, remote address is {}", socket.remoteAddress)
                 println(Messages.SERVER_ACCEPTED_CLIENT)
                 val client = ConnectedClient(socket, ++clientId, roomContainer, clientContainer)
                 clientContainer.add(client)
