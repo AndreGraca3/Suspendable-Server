@@ -1,7 +1,10 @@
 package pt.isel.pc.baseServer
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 import pt.isel.pc.problemsets.set3.MessageQueue
+import pt.isel.pc.utils.BufferedSocketChannel
 import java.io.BufferedWriter
 import java.net.Socket
 import java.nio.channels.AsynchronousSocketChannel
@@ -23,7 +26,8 @@ class ConnectedClient(
     id: Int,
     private val roomContainer: RoomContainer,
     private val clientContainer: ConnectedClientContainer,
-) {
+    private val scope: CoroutineScope
+    ) {
 
     val name = "client-$id"
 
@@ -52,19 +56,19 @@ class ConnectedClient(
         controlQueue.enqueue(ControlMessage.Shutdown)
     }
 
-    fun join() = mainLoopThread.join()
+    suspend fun join() = mainLoopThread.join()
 
     private val controlQueue = MessageQueue<ControlMessage>(Int.MAX_VALUE)
-    private val readLoopThread = thread(isDaemon = true) { readLoop() }
-    private val mainLoopThread = thread(isDaemon = true) { mainLoop() }
+    private val readLoopThread = scope.launch { readLoop() }
+    private val mainLoopThread = scope.launch { mainLoop() }
 
     private var room: Room? = null
 
     private suspend fun mainLoop() {
         logger.info("[{}] main loop started", name)
         socket.use {
-            socket.getOutputStream().bufferedWriter().use { writer ->
-                writer.writeLine(Messages.CLIENT_WELCOME)
+            val buffer = BufferedSocketChannel(it)
+                buffer.writeLine(Messages.CLIENT_WELCOME)
                 while (true) {
                     when (val control = controlQueue.dequeue(Long.MAX_VALUE.toDuration(DurationUnit.SECONDS))) {
                         is ControlMessage.Shutdown -> {

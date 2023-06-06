@@ -1,5 +1,6 @@
 package pt.isel.pc.baseServer
 
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 
@@ -13,16 +14,18 @@ fun main() {
     runBlocking {
         logger.info("main started")
         // By default, we listen on port 8080 of all interfaces
-        val server = Server("0.0.0.0", 8080)
+        val server = Server("0.0.0.0", 8080, this)
 
         // Shutdown hook to handle SIG_TERM signals (gracious shutdown)
         Runtime.getRuntime().addShutdownHook(
             Thread {
-                logger.info("shutdown hook started")
-                server.shutdown()
-                logger.info("waiting for server to end")
-                server.join()
-                logger.info("server ended")
+                this.launch {
+                    logger.info("shutdown hook started")
+                    server.shutdown()
+                    logger.info("waiting for server to end")
+                    server.join()
+                    logger.info("server ended")
+                }
             }
         )
         server.join()

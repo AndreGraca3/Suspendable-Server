@@ -22,12 +22,14 @@ class Room(
         connectedClients.remove(connectedClient)
     }
 
-    fun post(sender: ConnectedClient, message: String) = lock.withLock {
-        connectedClients.forEach {
+    suspend fun post(sender: ConnectedClient, message: String) {
+        lock.lock()
+        for (it in connectedClients) {
             if (it != sender) {
                 it.send(sender, message)
             }
         }
+        lock.unlock()
     }
 
     override fun toString() = name

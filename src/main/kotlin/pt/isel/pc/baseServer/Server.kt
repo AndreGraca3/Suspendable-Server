@@ -5,11 +5,9 @@ import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 import pt.isel.pc.problemsets.set3.suspendingAccept
 import java.net.InetSocketAddress
-import java.net.ServerSocket
 import java.net.SocketException
 import java.nio.channels.AsynchronousServerSocketChannel
 import java.util.concurrent.CountDownLatch
-import kotlin.concurrent.thread
 
 /**
  * Represents a server to which clients can connect, enter and leave rooms, and send messages.

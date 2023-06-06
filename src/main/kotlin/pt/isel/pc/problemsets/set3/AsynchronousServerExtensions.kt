@@ -35,11 +35,10 @@ suspend fun AsynchronousServerSocketChannel.suspendingAccept(): AsynchronousSock
     }
 }
 
-suspend fun AsynchronousSocketChannel.suspendingWrite(text: String): Int {
+suspend fun AsynchronousSocketChannel.suspendingWrite(buffer: ByteBuffer): Int {
     return suspendCancellableCoroutine { continuation ->
-        val toSend = CharBuffer.wrap(text + "\r\n")
 
-        write(encoder.encode(toSend), null, object : CompletionHandler<Int, Any?> {
+        write(encoder.encode(buffer.asCharBuffer()), null, object : CompletionHandler<Int, Any?> {
             override fun completed(result: Int, attachment: Any?) {
                 println("suspendingWrite success!")
                 continuation.resume(result)
@@ -53,15 +52,13 @@ suspend fun AsynchronousSocketChannel.suspendingWrite(text: String): Int {
     }
 }
 
-suspend fun AsynchronousSocketChannel.suspendRead(): String {
+suspend fun AsynchronousSocketChannel.suspendRead(buffer: ByteBuffer): Int {
     return suspendCancellableCoroutine { continuation ->
-        val buffer = ByteBuffer.allocate(1024)
 
         read(buffer, null, object : CompletionHandler<Int, Any?>{
             override fun completed(result: Int, attachment: Any?) {
                 println("suspendRead success!")
-                val received = decoder.decode(buffer.flip()).toString().trim()
-                continuation.resume(received)
+                continuation.resume(result)
             }
 
             override fun failed(exc: Throwable, attachment: Any?) {
