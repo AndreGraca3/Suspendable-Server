@@ -73,14 +73,14 @@ class ConnectedClient(
                     when (val control = controlQueue.dequeue(Long.MAX_VALUE.toDuration(DurationUnit.SECONDS))) {
                         is ControlMessage.Shutdown -> {
                             logger.info("[{}] received control message: {}", name, control)
-                            writer.writeLine(Messages.SERVER_IS_ENDING)
+                            buffer.writeLine(Messages.SERVER_IS_ENDING)
                             readLoopThread.interrupt()
                             break
                         }
 
                         is ControlMessage.RoomMessage -> {
                             logger.trace("[{}] received control message: {}", name, control)
-                            writer.writeLine(Messages.messageFromClient(control.sender.name, control.message))
+                            buffer.writeLine(Messages.messageFromClient(control.sender.name, control.message))
                         }
 
                         is ControlMessage.RemoteClientRequest -> {
@@ -99,7 +99,7 @@ class ConnectedClient(
         readLoopThread.join()
         clientContainer.remove(this)
         logger.info("[{}] main loop ending", name)
-    }
+
 
     private fun handleRemoteClientRequest(
         clientRequest: ClientRequest,

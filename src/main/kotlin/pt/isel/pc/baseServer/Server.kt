@@ -61,7 +61,7 @@ class Server(
                 val socket = serverSocket.suspendingAccept()
                 logger.info("client socket accepted, remote address is {}", socket.remoteAddress)
                 println(Messages.SERVER_ACCEPTED_CLIENT)
-                val client = ConnectedClient(socket, ++clientId, roomContainer, clientContainer)
+                val client = ConnectedClient(socket, ++clientId, roomContainer, clientContainer, scope)
                 clientContainer.add(client)
             } catch (ex: SocketException) {
                 logger.info("SocketException, ending")
