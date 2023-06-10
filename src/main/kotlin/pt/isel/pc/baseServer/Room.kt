@@ -24,7 +24,7 @@ class Room(
 
     suspend fun post(sender: ConnectedClient, message: String) {
         lock.lock()
-        for (it in connectedClients) {
+        connectedClients.forEach {
             if (it != sender) {
                 it.send(sender, message)
             }

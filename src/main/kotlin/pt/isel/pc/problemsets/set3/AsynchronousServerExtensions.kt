@@ -2,17 +2,11 @@ package pt.isel.pc.problemsets.set3
 
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.nio.ByteBuffer
-import java.nio.CharBuffer
 import java.nio.channels.AsynchronousServerSocketChannel
 import java.nio.channels.AsynchronousSocketChannel
 import java.nio.channels.CompletionHandler
-import java.nio.charset.CharsetDecoder
-import java.nio.charset.CharsetEncoder
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
-
-private val encoder: CharsetEncoder = Charsets.UTF_8.newEncoder()
-private val decoder: CharsetDecoder = Charsets.UTF_8.newDecoder()
 
 /**
  * Accepts server connections in Server Socket Channel and
@@ -38,7 +32,7 @@ suspend fun AsynchronousServerSocketChannel.suspendingAccept(): AsynchronousSock
 suspend fun AsynchronousSocketChannel.suspendingWrite(buffer: ByteBuffer): Int {
     return suspendCancellableCoroutine { continuation ->
 
-        write(encoder.encode(buffer.asCharBuffer()), null, object : CompletionHandler<Int, Any?> {
+        write(buffer, null, object : CompletionHandler<Int, Any?> {
             override fun completed(result: Int, attachment: Any?) {
                 println("suspendingWrite success!")
                 continuation.resume(result)

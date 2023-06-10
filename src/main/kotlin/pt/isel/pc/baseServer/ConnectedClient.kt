@@ -6,11 +6,7 @@ import org.slf4j.LoggerFactory
 import pt.isel.pc.problemsets.set3.MessageQueue
 import pt.isel.pc.utils.BufferedSocketChannel
 import java.io.BufferedWriter
-import java.net.Socket
 import java.nio.channels.AsynchronousSocketChannel
-import java.util.concurrent.LinkedBlockingQueue
-import java.util.concurrent.TimeUnit
-import kotlin.concurrent.thread
 import kotlin.time.DurationUnit
 import kotlin.time.toDuration
 
@@ -74,7 +70,7 @@ class ConnectedClient(
                         is ControlMessage.Shutdown -> {
                             logger.info("[{}] received control message: {}", name, control)
                             buffer.writeLine(Messages.SERVER_IS_ENDING)
-                            readLoopThread.interrupt()
+                            readLoopThread.cancel()
                             break
                         }
 
@@ -85,6 +81,7 @@ class ConnectedClient(
 
                         is ControlMessage.RemoteClientRequest -> {
                             val line = control.request
+                            val writer = BufferedSocketChannel(socket)
                             if (handleRemoteClientRequest(line, writer)) break
                         }
 
@@ -95,15 +92,14 @@ class ConnectedClient(
                     }
                 }
             }
-        }
         readLoopThread.join()
         clientContainer.remove(this)
         logger.info("[{}] main loop ending", name)
+    }
 
-
-    private fun handleRemoteClientRequest(
+    private suspend fun handleRemoteClientRequest(
         clientRequest: ClientRequest,
-        writer: BufferedWriter,
+        writer: BufferedSocketChannel,
     ): Boolean {
         when (clientRequest) {
             is ClientRequest.EnterRoomCommand -> {
@@ -125,7 +121,7 @@ class ConnectedClient(
                 logger.info("[{}] received remote client request: {}", name, clientRequest)
                 room?.remove(this)
                 writer.writeLine(Messages.BYE)
-                readLoopThread.interrupt()
+                readLoopThread.cancel()
                 return true
             }
 
@@ -148,10 +144,11 @@ class ConnectedClient(
     }
 
     private suspend fun readLoop() {
-        socket.getInputStream().bufferedReader().use { reader ->
+        socket.use { reader ->
             try {
                 while (true) {
-                    val line: String? = reader.readLine()
+                    val buffer = BufferedSocketChannel(socket)
+                    val line: String? = buffer.readLine()
                     if (line == null) {
                         logger.info("[{}] end of input stream reached", name)
                         controlQueue.enqueue(ControlMessage.RemoteInputClosed)
@@ -162,7 +159,7 @@ class ConnectedClient(
             } catch (ex: Throwable) {
                 logger.info("[{}]Exception on read loop: {}, {}", name, ex.javaClass.name, ex.message)
                 // clear interrupt flag
-                Thread.interrupted()
+                //Thread.interrupted()
                 controlQueue.enqueue(ControlMessage.RemoteInputClosed)
             }
             logger.info("[{}] client loop ending", name)

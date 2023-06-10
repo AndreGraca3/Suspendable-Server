@@ -1,9 +1,10 @@
 package pt.isel.pc.baseServer
 
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 
 private val logger = LoggerFactory.getLogger("main")
@@ -30,6 +31,12 @@ fun main() {
                 }
             }
         )
+        withContext(Dispatchers.IO) {
+            when(readln()) {
+                "exit" -> server.shutdown()
+                "shutdown timeout" -> TODO()
+            }
+        }
         server.join()
         logger.info("server ending")
     }
