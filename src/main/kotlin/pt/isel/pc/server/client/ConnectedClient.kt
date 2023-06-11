@@ -1,8 +1,11 @@
-package pt.isel.pc.baseServer
+package pt.isel.pc.server.client
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
+import pt.isel.pc.server.messages.Messages
+import pt.isel.pc.server.room.Room
+import pt.isel.pc.server.room.RoomContainer
 import pt.isel.pc.problemsets.set3.MessageQueue
 import pt.isel.pc.utils.BufferedSocketChannel
 import java.io.BufferedWriter
@@ -22,8 +25,8 @@ class ConnectedClient(
     id: Int,
     private val roomContainer: RoomContainer,
     private val clientContainer: ConnectedClientContainer,
-    private val scope: CoroutineScope
-    ) {
+    scope: CoroutineScope
+) {
 
     val name = "client-$id"
 
@@ -47,16 +50,21 @@ class ConnectedClient(
         controlQueue.enqueue(ControlMessage.RoomMessage(sender, message))
     }
 
+    suspend fun sendSystemMessage(message: String) {
+        val buffer = BufferedSocketChannel(socket)
+        buffer.writeLine("'System' says: $message")
+    }
+
     suspend fun shutdown() {
         // just add a control message into the control queue
         controlQueue.enqueue(ControlMessage.Shutdown)
     }
 
-    suspend fun join() = mainLoopThread.join()
+    suspend fun join() = mainLoopCoroutine.join()
 
     private val controlQueue = MessageQueue<ControlMessage>(Int.MAX_VALUE)
-    private val readLoopThread = scope.launch { readLoop() }
-    private val mainLoopThread = scope.launch { mainLoop() }
+    private val readLoopCoroutine = scope.launch { readLoop() }
+    private val mainLoopCoroutine = scope.launch { mainLoop() }
 
     private var room: Room? = null
 
@@ -64,35 +72,35 @@ class ConnectedClient(
         logger.info("[{}] main loop started", name)
         socket.use {
             val buffer = BufferedSocketChannel(it)
-                buffer.writeLine(Messages.CLIENT_WELCOME)
-                while (true) {
-                    when (val control = controlQueue.dequeue(Long.MAX_VALUE.toDuration(DurationUnit.SECONDS))) {
-                        is ControlMessage.Shutdown -> {
-                            logger.info("[{}] received control message: {}", name, control)
-                            buffer.writeLine(Messages.SERVER_IS_ENDING)
-                            readLoopThread.cancel()
-                            break
-                        }
+            buffer.writeLine(Messages.CLIENT_WELCOME)
+            while (true) {
+                when (val control = controlQueue.dequeue(Long.MAX_VALUE.toDuration(DurationUnit.SECONDS))) {
+                    is ControlMessage.Shutdown -> {
+                        logger.info("[{}] received control message: {}", name, control)
+                        buffer.writeLine(Messages.SERVER_IS_ENDING)
+                        readLoopCoroutine.cancel()
+                        break
+                    }
 
-                        is ControlMessage.RoomMessage -> {
-                            logger.trace("[{}] received control message: {}", name, control)
-                            buffer.writeLine(Messages.messageFromClient(control.sender.name, control.message))
-                        }
+                    is ControlMessage.RoomMessage -> {
+                        logger.trace("[{}] received control message: {}", name, control)
+                        buffer.writeLine(Messages.messageFromClient(control.sender.name, control.message))
+                    }
 
-                        is ControlMessage.RemoteClientRequest -> {
-                            val line = control.request
-                            val writer = BufferedSocketChannel(socket)
-                            if (handleRemoteClientRequest(line, writer)) break
-                        }
+                    is ControlMessage.RemoteClientRequest -> {
+                        val line = control.request
+                        val writer = BufferedSocketChannel(socket)
+                        if (handleRemoteClientRequest(line, writer)) break
+                    }
 
-                        ControlMessage.RemoteInputClosed -> {
-                            logger.info("[{}] received control message: {}", name, control)
-                            break
-                        }
+                    ControlMessage.RemoteInputClosed -> {
+                        logger.info("[{}] received control message: {}", name, control)
+                        break
                     }
                 }
             }
-        readLoopThread.join()
+        }
+        readLoopCoroutine.join()
         clientContainer.remove(this)
         logger.info("[{}] main loop ending", name)
     }
@@ -121,7 +129,7 @@ class ConnectedClient(
                 logger.info("[{}] received remote client request: {}", name, clientRequest)
                 room?.remove(this)
                 writer.writeLine(Messages.BYE)
-                readLoopThread.cancel()
+                readLoopCoroutine.cancel()
                 return true
             }
 
@@ -144,7 +152,7 @@ class ConnectedClient(
     }
 
     private suspend fun readLoop() {
-        socket.use { reader ->
+        socket.use {
             try {
                 while (true) {
                     val buffer = BufferedSocketChannel(socket)

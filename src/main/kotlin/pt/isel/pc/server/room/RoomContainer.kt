@@ -1,4 +1,4 @@
-package pt.isel.pc.baseServer
+package pt.isel.pc.server.room
 
 import java.util.concurrent.ConcurrentHashMap
 

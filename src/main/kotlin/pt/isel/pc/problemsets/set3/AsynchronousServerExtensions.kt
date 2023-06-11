@@ -17,12 +17,10 @@ suspend fun AsynchronousServerSocketChannel.suspendingAccept(): AsynchronousSock
     return suspendCancellableCoroutine { continuation ->
         accept(null, object : CompletionHandler<AsynchronousSocketChannel, Any?> {
             override fun completed(sessionSocket: AsynchronousSocketChannel, attachment: Any?) {
-                println("suspendingAccept success!")
                 continuation.resume(sessionSocket)
             }
 
             override fun failed(exc: Throwable, attachment: Any?) {
-                println("suspendingAccept failed!")
                 continuation.resumeWithException(exc)
             }
         })
@@ -34,29 +32,25 @@ suspend fun AsynchronousSocketChannel.suspendingWrite(buffer: ByteBuffer): Int {
 
         write(buffer, null, object : CompletionHandler<Int, Any?> {
             override fun completed(result: Int, attachment: Any?) {
-                println("suspendingWrite success!")
                 continuation.resume(result)
             }
 
             override fun failed(exc: Throwable, attachment: Any?) {
-                println("suspendingWrite failed!")
                 continuation.resumeWithException(exc)
             }
         })
     }
 }
 
-suspend fun AsynchronousSocketChannel.suspendRead(buffer: ByteBuffer): Int {
+suspend fun AsynchronousSocketChannel.suspendingRead(buffer: ByteBuffer): Int {
     return suspendCancellableCoroutine { continuation ->
 
         read(buffer, null, object : CompletionHandler<Int, Any?>{
             override fun completed(result: Int, attachment: Any?) {
-                println("suspendRead success!")
                 continuation.resume(result)
             }
 
             override fun failed(exc: Throwable, attachment: Any?) {
-                println("suspendRead failed!")
                 continuation.resumeWithException(exc)
             }
 

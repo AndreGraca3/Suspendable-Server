@@ -1,5 +1,6 @@
-package pt.isel.pc.baseServer
+package pt.isel.pc.server.room
 
+import pt.isel.pc.server.client.ConnectedClient
 import java.util.HashSet
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock

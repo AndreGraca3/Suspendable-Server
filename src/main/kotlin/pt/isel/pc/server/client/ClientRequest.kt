@@ -1,4 +1,4 @@
-package pt.isel.pc.baseServer
+package pt.isel.pc.server.client
 
 /**
  * Sealed interface to represent all possible request lines sent by the client.

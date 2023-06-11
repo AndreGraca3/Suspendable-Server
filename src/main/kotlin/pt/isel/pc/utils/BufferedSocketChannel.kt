@@ -1,7 +1,7 @@
 package pt.isel.pc.utils
 
 import org.slf4j.LoggerFactory
-import pt.isel.pc.problemsets.set3.suspendRead
+import pt.isel.pc.problemsets.set3.suspendingRead
 import pt.isel.pc.problemsets.set3.suspendingWrite
 import java.io.Closeable
 import java.nio.ByteBuffer
@@ -109,7 +109,7 @@ class BufferedSocketChannel(
      */
     private suspend fun moreBytesToInputBuffer(): Boolean {
         var nBytes = fill(inBuffer)
-        if (nBytes == -2)  nBytes = channel.suspendRead(inBuffer)
+        if (nBytes == -2)  nBytes = channel.suspendingRead(inBuffer)
         logger.info("read $nBytes bytes  from channel ${channel.localAddress}")
         inBuffer.flip()  // put in read mode
         if (nBytes > 0 && isEolPair(lastEol, Char(inBuffer[0].toInt()))) { // Discard possible Eol Pair

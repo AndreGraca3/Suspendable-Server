@@ -1,13 +1,17 @@
-package pt.isel.pc.baseServer
+package pt.isel.pc.server
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
 import pt.isel.pc.problemsets.set3.suspendingAccept
+import pt.isel.pc.server.client.ConnectedClient
+import pt.isel.pc.server.client.ConnectedClientContainer
+import pt.isel.pc.server.messages.Messages
+import pt.isel.pc.server.room.RoomContainer
 import java.net.InetSocketAddress
 import java.net.SocketException
 import java.nio.channels.AsynchronousServerSocketChannel
 import java.util.concurrent.CountDownLatch
+import kotlin.time.Duration
 
 /**
  * Represents a server to which clients can connect, enter and leave rooms, and send messages.
@@ -20,12 +24,13 @@ class Server(
 
     private val serverSocket: AsynchronousServerSocketChannel = AsynchronousServerSocketChannel.open()
     private val isListening = CountDownLatch(1)
+    private val clientContainer = ConnectedClientContainer()
 
     /**
      * The listening thread is mainly comprised by loop waiting for connections and creating a [ConnectedClient]
      * for each accepted connection.
      */
-    private val listeningThread = scope.launch {
+    private val listeningCoroutine = scope.launch {
         serverSocket.use { serverSocket ->
             serverSocket.bind(InetSocketAddress(listeningAddress, listeningPort))
             logger.info("server socket bound to ({}:{})", listeningAddress, listeningPort)
@@ -44,7 +49,17 @@ class Server(
         serverSocket.close()
     }
 
-    suspend fun join() = listeningThread.join()
+    fun shutdownWithTimeout(timeout: Duration) {
+        scope.launch {
+            logger.info("closing the server in ${timeout.inWholeSeconds} seconds")
+            listeningCoroutine.cancel()
+            clientContainer.warnShutdown(timeout.inWholeSeconds)
+            delay(timeout)
+            clientContainer.shutdown()
+        }
+    }
+
+    suspend fun join() = listeningCoroutine.join()
 
     override fun close() {
         shutdown()
@@ -54,7 +69,6 @@ class Server(
     private suspend fun acceptLoop(serverSocket: AsynchronousServerSocketChannel) {
         var clientId = 0
         val roomContainer = RoomContainer()
-        val clientContainer = ConnectedClientContainer()
         while (true) {
             try {
                 logger.info("accepting new client")

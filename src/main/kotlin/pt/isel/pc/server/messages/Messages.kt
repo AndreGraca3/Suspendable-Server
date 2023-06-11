@@ -1,4 +1,4 @@
-package pt.isel.pc.baseServer
+package pt.isel.pc.server.messages
 
 /**
  * Messages returned to the client or written into the standard output.
@@ -14,4 +14,5 @@ object Messages {
 
     fun enteredRoom(name: String) = "OK: entered room $name"
     fun messageFromClient(client: String, msg: String) = "'$client' says: $msg"
+    fun serverEndingSoon(timeout: Long) = "Server is closing in $timeout seconds."
 }

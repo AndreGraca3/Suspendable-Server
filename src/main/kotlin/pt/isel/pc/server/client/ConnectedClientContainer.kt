@@ -1,5 +1,6 @@
-package pt.isel.pc.baseServer
+package pt.isel.pc.server.client
 
+import pt.isel.pc.server.messages.Messages
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
@@ -21,6 +22,14 @@ class ConnectedClientContainer {
 
     fun remove(connectedClient: ConnectedClient) = lock.withLock {
         clients.remove(connectedClient)
+    }
+
+    suspend fun warnShutdown(timeout: Long) {
+        lock.lock()
+        clients.toList().forEach {
+            it.sendSystemMessage(Messages.serverEndingSoon(timeout))
+        }
+        lock.unlock()
     }
 
     suspend fun shutdown() {
